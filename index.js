@@ -55,12 +55,11 @@ async function fetchAndUpdateSearchResult(handlerInput, keywords, maxResults, pa
     return result
 }
 
-async function fetchAndPlayItem(handlerInput, item, mode) {
-    if (!mode) mode = 'REPLACE_ALL';
+async function fetchAndPlayItem(handlerInput, item, format = 'video', mode = 'REPLACE_ALL') {
     const responseBuilder = handlerInput.responseBuilder;
     const sessionAttrs = handlerInput.attributesManager.getSessionAttributes();
-    if (mode !== 'ENQUEUE' && LibUtils.supportsDisplay(handlerInput)) {
-        // play video ('ENQUEUE' implies audio)
+    if (format === 'video' && LibUtils.supportsDisplay(handlerInput)) {
+        // play video
         /** @namespace video.id.videoId */
         const video = await LibYoutubeVideo.getAsset(item.id.videoId, 'video');
         responseBuilder.addVideoAppLaunchDirective(video.url + '&.mp4', item.title, `From ${item.channelTitle}`);
@@ -183,24 +182,29 @@ const QuickPlayIntentHandler = {
     canHandle(handlerInput) {
         const request = handlerInput.requestEnvelope.request;
         /** @namespace request.intent */
-        return request.intent.name === 'QuickPlayIntent'
+        return request.intent.name === 'QuickPlayIntent' ||
+            request.intent.name === 'QuickPlayAudioIntent'
     },
 
     async handle(handlerInput) {
         const attributesManager = handlerInput.attributesManager;
         const responseBuilder = handlerInput.responseBuilder;
-        const qpKeywords = LibUtils.getSlots(handlerInput).qpKeywords.value;
+        const request = handlerInput.requestEnvelope.request;
+        /** @namespace request.intent */
+        const slotName = request.intent.name === 'QuickPlayIntent' ? 'qpKeywords':'qpaKeywords';
+        const qpKeywords = LibUtils.getSlots(handlerInput)[slotName].value;
+        const format = slotName === 'QuickPlayIntent' ? 'video':'audio';
 
         try {
             const result = await fetchSearchResult(qpKeywords, 1);
             const item = result.items[0];
             attributesManager.setSessionAttributes({});
-            await fetchAndPlayItem(handlerInput, item)
+            await fetchAndPlayItem(handlerInput, item, format)
         }
         catch (err) {
             console.log('Error: QuickPlayIntent');
             console.dir(err);
-            responseBuilder.speak('Failed to retrieve video.')
+            responseBuilder.speak(`Failed to retrieve ${format}.`)
         }
         return responseBuilder.getResponse()
     }
@@ -210,7 +214,6 @@ const AudioEndingHandler = {
     canHandle(handlerInput) {
         const request = handlerInput.requestEnvelope.request;
         return request.type === 'AudioPlayer.PlaybackNearlyFinished' || request.type === 'AudioPlayer.PlaybackFinished'
-
     },
 
     async handle(handlerInput) {
@@ -224,7 +227,7 @@ const AudioEndingHandler = {
             const related = await LibYoutubeInfo.related(sessionAttrs.currentVideoId, 1);
             const item = related[0];
             const playerVerb = request.type === 'AudioPlayer.PlaybackNearlyFinished' ? 'ENQUEUE':'REPLACE_ALL';
-            await fetchAndPlayItem(handlerInput, item, playerVerb);
+            await fetchAndPlayItem(handlerInput, item, 'audio', playerVerb);
         }
         catch (err) {
             console.log('Error: AudioEndingHandler');
@@ -237,7 +240,8 @@ const AudioEndingHandler = {
 const AudioNextHandler = {
     canHandle(handlerInput) {
         const request = handlerInput.requestEnvelope.request;
-        return request.type === 'PlaybackController.NextCommandIssued'
+        /** @namespace request.intent */
+        return request.intent.name === 'AMAZON.NextIntent'
     },
 
     async handle(handlerInput) {

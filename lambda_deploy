@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /Users/chenzerui/Desktop/Alexa\ Skills/Youtube/
+cd /Users/chenzerui/Desktop/Alexa\ Skills/Hyper\ Video/
 echo 'zipping'
 zip -urq /tmp/Alexa-Youtube.zip * -x ./lambda_display ./package*
 echo 'uploading archive'
