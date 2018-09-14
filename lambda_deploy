@@ -1,0 +1,9 @@
+#!/bin/bash
+cd /Users/chenzerui/Desktop/Alexa\ Skills/Youtube/
+echo 'zipping'
+zip -urq /tmp/Alexa-Youtube.zip * -x ./lambda_display ./package*
+echo 'uploading archive'
+aws s3 cp /tmp/Alexa-Youtube.zip s3://axelahci/
+echo 'updating function'
+aws lambda update-function-code --function-name Alexa-Youtube --s3-bucket axelahci --s3-key Alexa-Youtube.zip
+echo 'done'
